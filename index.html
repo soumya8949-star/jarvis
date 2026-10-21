@@ -1,0 +1,77 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>@srp_elsewhere Agent</title>
+<style>
+:root{--bg:#0b0d10;--card:#14181d;--line:#232a32;--tx:#e8ecf0;--mut:#8b96a3;--ac:#e0b36a;--bad:#e5645f;--ok:#5fbf8a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px system-ui,sans-serif}
+header{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+h1{font-size:16px;margin:0;letter-spacing:.08em;font-weight:600}h1 span{color:var(--ac)}
+nav{display:flex;gap:6px;overflow-x:auto;padding:10px 12px;border-bottom:1px solid var(--line)}
+nav button{background:none;border:1px solid var(--line);color:var(--mut);padding:7px 12px;border-radius:20px;white-space:nowrap;cursor:pointer}
+nav button.on{color:#111;background:var(--ac);border-color:var(--ac)}
+main{max-width:900px;margin:0 auto;padding:14px}section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+input,textarea,select{width:100%;background:#0e1115;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:9px;margin:4px 0 8px;font:inherit}
+textarea{min-height:90px}button.b{background:var(--ac);color:#111;border:0;border-radius:8px;padding:9px 14px;font-weight:600;cursor:pointer;margin:2px 4px 2px 0}
+button.g{background:none;color:var(--tx);border:1px solid var(--line)}.pill{font-size:12px;padding:2px 8px;border-radius:10px;border:1px solid var(--line);color:var(--mut)}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.mut{color:var(--mut);font-size:13px}pre{white-space:pre-wrap;font:inherit}
+.bar{height:10px;background:var(--ac);border-radius:5px;margin:4px 0}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+</style></head><body>
+<header><h1>@SRP_<span>ELSEWHERE</span> AGENT</h1><span id="st" class="mut">checking…</span></header>
+<nav id="nav"></nav><main>
+<section id="overview"><div class="row"><div class="card"><b>Connections</b><div id="conn" class="mut"></div></div>
+<div class="card"><b>Drafts</b><div id="ovd" class="mut"></div></div></div><div class="card"><b>Calendar (scheduled)</b><div id="cal" class="mut"></div></div></section>
+<section id="studio"><div class="card"><b>AI Content Studio</b>
+<select id="task"><option value="reels">Reel ideas, hooks, captions, shot lists</option><option value="calendar">Weekly calendar</option></select>
+<textarea id="prompt" placeholder="Location, mood, footage you have (e.g. Hampi temples at sunrise)"></textarea>
+<button class="b" onclick="gen('studio')">Generate</button><pre id="out"></pre>
+<button class="b g" onclick="saveOut()">Save output as draft</button></div></section>
+<section id="drafts"><div class="card"><b>New draft</b><input id="dt" placeholder="Title"><textarea id="dc" placeholder="Caption"></textarea>
+<input id="dh" placeholder="#hashtags"><input id="dv" placeholder="Public https video URL (needed to publish a Reel)">
+<button class="b" onclick="addDraft()">Save draft</button></div><div id="dl"></div></section>
+<section id="analytics"><div class="card"><button class="b" onclick="loadIns()">Load real insights</button><div id="ins" class="mut"></div></div></section>
+<section id="engage"><div class="card"><b>Engagement assistant</b><textarea id="ectx" placeholder="Paste the comment or DM context"></textarea>
+<input id="cid" placeholder="Instagram comment ID (optional; empty means DM, copy manually)">
+<select id="etask"><option value="reply">Comment reply</option><option value="dm">Collaboration DM</option></select>
+<button class="b" onclick="gen('engage')">Suggest</button><textarea id="etxt" placeholder="Edit the suggestion here"></textarea>
+<button class="b" onclick="queueReply()">Queue for approval</button></div><div id="rl"></div></section>
+<section id="strat"><div class="card"><b>AI Strategist</b><div class="mut">Uses only your real Instagram data. Needs a connected account.</div>
+<button class="b" onclick="strat()">Analyze</button><pre id="sout"></pre></div></section>
+<section id="settings"><div class="card"><b>Integration settings</b><pre id="set" class="mut"></pre></div></section></main>
+<script>
+const $=id=>document.getElementById(id),T=[["overview","Overview"],["studio","Studio"],["drafts","Drafts"],["analytics","Analytics"],["engage","Engagement"],["strat","Strategist"],["settings","Settings"]];
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const api=async(p,m="GET",b)=>{const r=await fetch("/api/"+p,{method:m,headers:{"Content-Type":"application/json"},body:b?JSON.stringify(b):undefined});return[r.ok,await r.json()]};
+$("nav").innerHTML=T.map(t=>`<button data-t="${t[0]}">${t[1]}</button>`).join("");
+$("nav").onclick=e=>{if(e.target.dataset.t)show(e.target.dataset.t)};
+function show(id){document.querySelectorAll("section").forEach(s=>s.classList.toggle("on",s.id==id));
+document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.t==id));refresh()}
+async function refresh(){const[,s]=await api("status");$("st").innerHTML=`AI <b class="${s.ai?"ok":"bad"}">${s.ai?"on":"off"}</b> · IG <b class="${s.instagram?"ok":"bad"}">${s.instagram?"connected":"not connected"}</b>`;
+$("conn").innerHTML=`Claude API: ${s.ai?"connected":"missing ANTHROPIC_API_KEY"}<br>Instagram: ${s.instagram?"token present (validity checked on first call)":"missing IG_ACCESS_TOKEN / IG_USER_ID"}`;
+$("set").textContent=`Required in .env:\nANTHROPIC_API_KEY\nIG_ACCESS_TOKEN\nIG_USER_ID\n\nInstagram needs a Business/Creator account linked to a Facebook Page, a Meta developer app, and permissions: instagram_basic, instagram_manage_insights, instagram_content_publish, instagram_manage_comments. Publishing a Reel needs a public https video URL. DMs cannot be sent by this app.\n\n${s.note}`;
+const[,d]=await api("drafts");$("ovd").textContent=`${d.length} total · ${d.filter(x=>x.status=="scheduled").length} scheduled · ${d.filter(x=>x.status=="published").length} published`;
+$("cal").innerHTML=d.filter(x=>x.status=="scheduled").map(x=>`${esc(x.scheduled_at)} — ${esc(x.title)}`).join("<br>")||"Nothing scheduled";
+$("dl").innerHTML=d.map(x=>`<div class="card"><input value="${esc(x.title)}" id="t${x.id}"><textarea id="c${x.id}">${esc(x.caption)}</textarea>
+<input value="${esc(x.hashtags)}" id="h${x.id}"><input value="${esc(x.video_url)}" id="v${x.id}" placeholder="video URL">
+<input type="datetime-local" id="s${x.id}"><span class="pill">${x.status}</span> <span class="bad">${esc(x.error||"")}</span><br>
+<button class="b" onclick="upd(${x.id})">Save</button><button class="b g" onclick="sched(${x.id})">Schedule</button>
+<button class="b g" onclick="pub(${x.id})">Publish now</button><button class="b g" onclick="del(${x.id})">Delete</button></div>`).join("")||'<div class="mut">No drafts yet</div>';
+const[,r]=await api("replies");$("rl").innerHTML=r.map(x=>`<div class="card"><pre>${esc(x.text)}</pre><span class="pill">${x.status}</span> <span class="bad">${esc(x.error||"")}</span><br>
+${x.status=="pending"?`<button class="b" onclick="rep(${x.id},'approve')">Approve${x.comment_id?" &amp; send":""}</button><button class="b g" onclick="rep(${x.id},'reject')">Reject</button>`:""}</div>`).join("")}
+async function gen(w){const o=w=="studio"?{task:$("task").value,input:$("prompt").value}:{task:$("etask").value,input:$("ectx").value};
+const[ok,r]=await api("ai","POST",o);const t=ok?r.text:"Error: "+r.error;if(w=="studio")$("out").textContent=t;else $("etxt").value=t}
+const saveOut=async()=>{await api("drafts","POST",{title:$("prompt").value.slice(0,60),caption:$("out").textContent});show("drafts")};
+const addDraft=async()=>{await api("drafts","POST",{title:$("dt").value,caption:$("dc").value,hashtags:$("dh").value,video_url:$("dv").value});refresh()};
+const upd=async i=>{await api("drafts/"+i,"PUT",{title:$("t"+i).value,caption:$("c"+i).value,hashtags:$("h"+i).value,video_url:$("v"+i).value});refresh()};
+const sched=async i=>{const v=$("s"+i).value;if(!v)return alert("Pick a date and time");await upd(i);
+await api("drafts/"+i,"PUT",{status:"scheduled",scheduled_at:new Date(v).toISOString()});refresh()};
+const pub=async i=>{await upd(i);const[,r]=await api("drafts/"+i+"/publish","POST");alert(r.ok?"Published":"Failed: "+r.error);refresh()};
+const del=async i=>{if(confirm("Delete?")){await api("drafts/"+i,"DELETE");refresh()}};
+const queueReply=async()=>{await api("replies","POST",{context:$("ectx").value,text:$("etxt").value,comment_id:$("cid").value});refresh()};
+const rep=async(i,a)=>{const[ok,r]=await api(`replies/${i}/${a}`,"POST");if(!ok)alert(JSON.stringify(r));refresh()};
+async function loadIns(){$("ins").textContent="Loading…";const[ok,r]=await api("insights");if(!ok)return $("ins").innerHTML=`<span class="bad">${esc(JSON.stringify(r.error))}</span>`;
+const m=r.media,mx=Math.max(1,...m.map(p=>p.insights.reach||0));
+$("ins").innerHTML=(r.profile?`<p>Followers: <b>${r.profile.followers_count}</b> · Posts: ${r.profile.media_count}</p>`:"")+m.map(p=>`<div>${esc((p.caption||"").slice(0,50))}<div class="bar" style="width:${(p.insights.reach||0)/mx*100}%"></div>
+reach ${p.insights.reach??"n/a"} · saves ${p.insights.saved??"n/a"} · shares ${p.insights.shares??"n/a"} · likes ${p.like_count??"n/a"}</div>`).join("<hr>")}
+async function strat(){$("sout").textContent="Analyzing…";const[ok,r]=await api("ai","POST",{task:"strategy",input:""});$("sout").textContent=ok?r.text:"Error: "+r.error}
+show("overview");
+</script></body></html>
